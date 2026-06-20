@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <meta charset="UTF-8">
+ <title>Uber売上記録</title>
+
+ <style>
+
+body {
+    font-family: sans-serif;
+    padding: 20px;
+    max-width: 800px;
+    margin: auto;
+}
+input {
+    margin: 5px;
+    padding: 5px;
+}
+button {
+    margin-left: 5px;
+    padding: 5px 10px;
+}
+li {
+ margin-bottom: 10px;
+ padding: 10px;
+ border: 3px solid green ;
+ border-radius: 8px;
+}
+
+h1 {text-align: center;}
+h2 {text-align: center;}
+
+</style>
+
+</head>
+
+<body>
+    <h1>Uber売上記録</h1> 
+    <h2 id="totalSales">合計売上: 0円</h2>
+    <h2 id="totalCount">総配達件数: 0円</h2>
+    <h2 id="monthSales">今月売上: 0円</h2>
+    <h2 id="monthHourly">今月平均時給: 0円</h2>
+
+    <input id="dateInput" type="date">
+
+    <input id="salesInput" type="number"
+placeholder="売上">
+
+    <input id="countInput" type="number"
+placeholder="配達件数">
+
+    <input id="hoursInput" type="number"
+placeholder="稼働時間">
+
+    <button onclick="addRecord()">追加</button>
+
+    <select id="sortSelect">
+        <option value="date">日付順</option>
+        <option value="sales">売上順</option>
+    </select>
+
+    <ul id="recordList"></ul>
+
+    <canvas id="salesChart"></canvas>
+
+    <script
+  src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+
+    let allRecords = [];
+    
+    function addRecord() {
+
+      console.log('addRecord動いた');
+
+        const date =
+    document.getElementById('dateInput').value;
+
+        const sales =
+    document.getElementById('salesInput').value;
+
+        const count =
+    document.getElementById('countInput').value; 
+
+        const hours =
+    document.getElementById('hoursInput').value;
+    
+
+    fetch('http://localhost:3000/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+
+     body: JSON.stringify({
+
+        date: date,
+        sales: sales,
+        count: count,
+        hours: hours
+        
+      })
+    })
+
+    .then(res => res.json())
+
+    .then(newRecord => {
+
+      const list =
+    document.getElementById('recordList');
+
+      const li = document.createElement('li');
+
+      const hourly =
+        Math.floor(newRecord.sales / newRecord.hours);
+
+      li.textContent =
+         newRecord.date +
+         ' 売上:' + newRecord.sales + '円' +
+         ' 配達:' + newRecord.count + '件' +
+         ' 稼働:' + newRecord.hours + '時間' +
+         ' 時給:' + hourly + '円';
+        
+    
+    location.reload();
+
+});
+      
+        console.log('追加ボタン押された');
+      }
+
+    fetch('http://localhost:3000/records')
+       .then(res => res.json())
+       .then(records => {
+
+    allRecords = records;
+
+
+        let total = 0;
+        let monthTotal = 0;
+        let monthHours = 0;
+        let totalCount = 0;
+
+
+        const list =
+    document.getElementById('recordList');
+
+        const labels = [];
+        const salesData = [];
+
+        const params =
+        new URLSearchParams(location.search);
+
+
+        const sortType =
+        params.get('sort') || 'date';
+
+        document.getElementById('sortSelect').value =
+        sortType;
+
+
+    if (sortType === 'date'){
+        records.sort((a, b) => new Date(a.date) -
+    new Date(b.date));
+    }
+
+    if (sortType === 'sales'){
+        records.sort((a, b) => Number(b.sales) -
+    Number(a.sales));
+    }
+
+
+    records.forEach(record => {
+
+    console.log(record);
+
+        const li = 
+    document.createElement('li');
+
+        const hourly =
+         Math.floor(record.sales / record.hours);
+
+        labels.push(record.date);
+        console.log('dataだけ:', record.date);
+
+        salesData.push(record.sales);
+
+        li.innerHTML =
+          '<strong>' + record.date + '</strong><br>' 
+          +
+          ' 売上: ' + record.sales + '円<br>' +
+          ' 配達件数: ' + record.count + '件<br>' + 
+          ' 稼働: ' + record.hours + '時間<br>' +
+          ' 時給: ' + hourly + '円<br>';
+
+
+         total += Number(record.sales);
+
+         totalCount += Number(record.count);
+
+         const today = new Date();
+
+         const currentMonth =
+             today.getFullYear() + '-' +
+             String(today.getMonth() + 1).padStart(2,
+                '0');
+        
+        if (record.date.startsWith(currentMonth)) {
+            monthTotal += Number(record.sales);
+            monthHours += Number(record.hours);
+        }
+
+
+        const editBtn =
+        document.createElement('button');
+        
+        editBtn.textContent = '編集';
+        
+        editBtn.onclick = () => {
+        
+            const newSales =
+              prompt('新しい売上を入力', record.sales);
+
+            if (!newSales) return;
+
+            fetch('http://localhost:3000/records/' + record.id, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+
+                body: JSON.stringify({
+                    date: record.date,
+                    sales: newSales,
+                    count: record.count,
+                    hours: record.hours
+                })
+              })
+               
+              .then(() => {
+                location.reload();
+              });
+            
+        };
+
+
+
+         const deleteBtn =
+        document.createElement('button');
+
+        deleteBtn.textContent = '削除';
+
+
+
+        deleteBtn.onclick = () => {
+        
+        fetch('http://localhost:3000/records/' + 
+        record.id, {
+            method: 'DELETE'
+        })
+
+        .then(() => {
+         li.remove();
+        });
+
+        };
+        
+
+           li.appendChild(editBtn);
+
+           li.appendChild(deleteBtn);
+
+           list.appendChild(li);
+        });
+
+
+        document.getElementById('totalSales')
+            .textContent = '合計売上: ' + total + '円';
+
+        document.getElementById('totalCount')
+            .textContent = '総配達件数: ' + totalCount + '件';
+        
+        const averageHourly =
+            Math.floor(monthTotal / monthHours);
+
+        document.getElementById('monthSales')
+            .textContent = '今月売上: ' + monthTotal +
+            '円';
+        
+        document.getElementById('monthHourly')
+            .textContent =
+            '今月平均時給: ' + averageHourly + '円';
+        
+        const ctx =
+          document.getElementById('salesChart');
+
+        console.log(labels);
+        console.log(salesData);
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: '売上',
+                data: salesData,
+                backgroundColor: 'blue'
+            }]
+        }
+    });
+});
+
+document.getElementById('sortSelect').onchange = () => {
+  const sortType =
+
+document.getElementById('sortSelect').value;
+
+  if (sortType === 'date') {
+    allRecord.sort((a, b) => new
+Date(a.date) - new Date(b.date));
+  }
+
+  if (sortType === 'sales') {
+     allRecords.sort((a, b) => 
+     Number(b.sales) - Number(a.sales));
+  }
+  
+  renderRecords(allRecords);
+
+  console.log(allRecords
+  );
+};
+
+
+  </script>
+  </body>
+  </html>
